@@ -1,4 +1,5 @@
 use anyhow::{Context, Result};
+use kenken::{Index, N, Operation, default_op_policy};
 use serde::{Deserialize, Serialize};
 use std::path::Path;
 
@@ -14,7 +15,7 @@ pub struct File {
 pub struct GenerateFile {
     pub n: Option<usize>,
     pub seed: Option<u64>,
-    pub op_policy: Option<String>,
+    pub op_policy: Option<OpPolicy>,
     pub size_distribution: Option<SizeDist>,
 }
 
@@ -23,9 +24,24 @@ pub struct HistogramFile {
     pub n: Option<usize>,
     pub trials: Option<usize>,
     pub seed: Option<u64>,
-    pub op_policy: Option<String>,
+    pub op_policy: Option<OpPolicy>,
     pub size_distribution: Option<SizeDist>,
     pub max_solutions: Option<usize>,
+}
+
+#[derive(Deserialize, Serialize, Debug, Clone, Copy, Default, clap::ValueEnum)]
+#[serde(rename_all = "lowercase")]
+pub enum OpPolicy {
+    #[default]
+    Default,
+}
+
+impl OpPolicy {
+    pub fn func(self) -> fn(&[N], Index) -> Operation {
+        match self {
+            Self::Default => default_op_policy,
+        }
+    }
 }
 
 #[derive(Deserialize, Serialize, Debug, Clone, Copy)]
@@ -40,6 +56,15 @@ impl From<SizeDist> for kenken::SizeDistribution {
         match s {
             SizeDist::Fixed { size } => Self::Fixed(size),
             SizeDist::Uniform { min, max } => Self::Uniform { min, max },
+        }
+    }
+}
+
+impl From<kenken::SizeDistribution> for SizeDist {
+    fn from(s: kenken::SizeDistribution) -> Self {
+        match s {
+            kenken::SizeDistribution::Fixed(size) => Self::Fixed { size },
+            kenken::SizeDistribution::Uniform { min, max } => Self::Uniform { min, max },
         }
     }
 }

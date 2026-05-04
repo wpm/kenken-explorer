@@ -1,6 +1,6 @@
 use anyhow::{Result, anyhow};
 use clap::Args;
-use kenken::{Puzzle, generate_with};
+use kenken::{DEFAULT_SIZE_DISTRIBUTION, Puzzle, generate_with};
 use rand::SeedableRng;
 use rand_chacha::ChaCha8Rng;
 use rayon::prelude::*;
@@ -9,24 +9,20 @@ use std::collections::BTreeMap;
 use std::path::Path;
 use std::time::Instant;
 
-use crate::config::{self, SizeDist};
-use crate::experiments::resolve_op_policy;
+use crate::config::{self, OpPolicy, SizeDist};
+use crate::experiments::DEFAULT_N;
 
 #[derive(Args, Debug)]
 pub struct HistogramArgs {
-    /// Grid side length (1..=9).
     #[arg(long)]
     pub n: Option<usize>,
-    /// Number of independent puzzles to generate.
     #[arg(long)]
     pub trials: Option<usize>,
     /// Master RNG seed; per-trial seed is master + trial index.
     #[arg(long)]
     pub seed: Option<u64>,
-    /// Op policy name (currently only "default").
-    #[arg(long)]
-    pub op_policy: Option<String>,
-    /// Stop counting solutions for any one puzzle after this many.
+    #[arg(long, value_enum)]
+    pub op_policy: Option<OpPolicy>,
     #[arg(long)]
     pub max_solutions: Option<usize>,
 }
@@ -36,7 +32,7 @@ struct Resolved {
     n: usize,
     trials: usize,
     seed: u64,
-    op_policy: String,
+    op_policy: OpPolicy,
     size_distribution: SizeDist,
     max_solutions: usize,
 }
@@ -50,11 +46,10 @@ struct Bucket {
 #[derive(Serialize)]
 struct ResultData {
     histogram: Vec<Bucket>,
-    cap_bucket: usize,
     no_solution_count: usize,
     unique_count: usize,
-    unique_rate: f64,
     multi_solution_count: usize,
+    unique_rate: f64,
 }
 
 #[derive(Serialize)]
@@ -75,24 +70,24 @@ pub fn run(config_path: Option<&Path>, args: HistogramArgs) -> Result<()> {
     let cfg = config::load(config_path)?.histogram;
 
     let resolved = Resolved {
-        n: args.n.or(cfg.n).unwrap_or(4),
+        n: args.n.or(cfg.n).unwrap_or(DEFAULT_N),
         trials: args.trials.or(cfg.trials).unwrap_or(100),
         seed: args.seed.or(cfg.seed).unwrap_or(0),
-        op_policy: args
-            .op_policy
-            .or(cfg.op_policy)
-            .unwrap_or_else(|| "default".to_string()),
+        op_policy: args.op_policy.or(cfg.op_policy).unwrap_or_default(),
         size_distribution: cfg
             .size_distribution
-            .unwrap_or(SizeDist::Uniform { min: 1, max: 4 }),
+            .unwrap_or_else(|| DEFAULT_SIZE_DISTRIBUTION.into()),
         max_solutions: args.max_solutions.or(cfg.max_solutions).unwrap_or(100),
     };
 
     if !(1..=9).contains(&resolved.n) {
         return Err(anyhow!("n must be in 1..=9, got {}", resolved.n));
     }
+    if resolved.max_solutions == 0 {
+        return Err(anyhow!("max_solutions must be >= 1"));
+    }
 
-    let policy = resolve_op_policy(&resolved.op_policy)?;
+    let policy = resolved.op_policy.func();
     let dist: kenken::SizeDistribution = resolved.size_distribution.into();
     let n = resolved.n;
     let max_solutions = resolved.max_solutions;
@@ -116,27 +111,25 @@ pub fn run(config_path: Option<&Path>, args: HistogramArgs) -> Result<()> {
     for c in &counts {
         *hist.entry(*c).or_insert(0) += 1;
     }
-    let histogram: Vec<Bucket> = hist
-        .into_iter()
-        .map(|(solutions, count)| Bucket { solutions, count })
-        .collect();
-
-    let no_solution_count = counts.iter().filter(|&&c| c == 0).count();
-    let unique_count = counts.iter().filter(|&&c| c == 1).count();
-    let multi_solution_count = counts.iter().filter(|&&c| c >= 2).count();
+    let no_solution_count = hist.get(&0).copied().unwrap_or(0);
+    let unique_count = hist.get(&1).copied().unwrap_or(0);
+    let multi_solution_count = hist.range(2..).map(|(_, &v)| v).sum();
     let unique_rate = if trials > 0 {
         unique_count as f64 / trials as f64
     } else {
         0.0
     };
+    let histogram: Vec<Bucket> = hist
+        .into_iter()
+        .map(|(solutions, count)| Bucket { solutions, count })
+        .collect();
 
     let result = ResultData {
         histogram,
-        cap_bucket: max_solutions,
         no_solution_count,
         unique_count,
-        unique_rate,
         multi_solution_count,
+        unique_rate,
     };
 
     let meta = Meta {
