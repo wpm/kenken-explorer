@@ -256,7 +256,7 @@ checksum = "8f42a60cbdf9a97f5d2305f08a87dc4e09308d1276d28c869c684d7777685682"
 [[package]]
 name = "kenken"
 version = "0.1.0"
-source = "git+https://github.com/wpm/KenKen.git#05c2c8fa836861a6f8184ddad7a3ae7fb4ccb0e7"
+source = "git+https://github.com/wpm/KenKen.git?rev=05c2c8fa836861a6f8184ddad7a3ae7fb4ccb0e7#05c2c8fa836861a6f8184ddad7a3ae7fb4ccb0e7"
 dependencies = [
  "itertools",
  "rand",

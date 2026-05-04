@@ -70,7 +70,9 @@ impl From<kenken::SizeDistribution> for SizeDist {
 }
 
 pub fn load(path: Option<&Path>) -> Result<File> {
-    let Some(path) = path else { return Ok(File::default()) };
+    let Some(path) = path else {
+        return Ok(File::default());
+    };
     let text = std::fs::read_to_string(path)
         .with_context(|| format!("reading config {}", path.display()))?;
     toml::from_str(&text).with_context(|| format!("parsing config {}", path.display()))

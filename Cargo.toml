@@ -6,7 +6,7 @@ edition = "2024"
 [dependencies]
 anyhow = "1"
 clap = { version = "4", features = ["derive"] }
-kenken = { git = "https://github.com/wpm/KenKen.git" }
+kenken = { git = "https://github.com/wpm/KenKen.git", rev = "05c2c8fa836861a6f8184ddad7a3ae7fb4ccb0e7" }
 rand = "0.10"
 rand_chacha = "0.10"
 rayon = "1"

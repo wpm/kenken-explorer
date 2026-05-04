@@ -46,6 +46,9 @@ struct Bucket {
 #[derive(Serialize)]
 struct ResultData {
     histogram: Vec<Bucket>,
+    /// The bucket whose `solutions` key equals `cap_bucket` aggregates every puzzle with
+    /// `>= cap_bucket` solutions; lower-keyed buckets are exact counts.
+    cap_bucket: usize,
     no_solution_count: usize,
     unique_count: usize,
     multi_solution_count: usize,
@@ -55,13 +58,13 @@ struct ResultData {
 #[derive(Serialize)]
 struct Meta {
     threads: usize,
-    elapsed_ms: u128,
+    elapsed_ms: u64,
 }
 
 #[derive(Serialize)]
-struct Output<'a> {
-    experiment: &'a str,
-    config: &'a Resolved,
+struct Output {
+    experiment: &'static str,
+    config: Resolved,
     meta: Meta,
     result: ResultData,
 }
@@ -97,14 +100,14 @@ pub fn run(config_path: Option<&Path>, args: HistogramArgs) -> Result<()> {
     let started = Instant::now();
     let counts: Vec<usize> = (0..trials)
         .into_par_iter()
-        .map(|i| {
+        .map(|i| -> Result<usize> {
             let seed_i = master_seed.wrapping_add(i as u64);
             let mut rng = ChaCha8Rng::seed_from_u64(seed_i);
             let puzzle: Puzzle = generate_with(n, &mut rng, policy, dist)
-                .expect("generate_with cannot fail for validated n");
-            puzzle.solutions_at_most(max_solutions)
+                .map_err(|e| anyhow!("generate_with failed at trial {i}: {e:?}"))?;
+            Ok(puzzle.solutions_at_most(max_solutions))
         })
-        .collect();
+        .collect::<Result<_>>()?;
     let elapsed = started.elapsed();
 
     let mut hist: BTreeMap<usize, usize> = BTreeMap::new();
@@ -126,6 +129,7 @@ pub fn run(config_path: Option<&Path>, args: HistogramArgs) -> Result<()> {
 
     let result = ResultData {
         histogram,
+        cap_bucket: max_solutions,
         no_solution_count,
         unique_count,
         multi_solution_count,
@@ -134,12 +138,12 @@ pub fn run(config_path: Option<&Path>, args: HistogramArgs) -> Result<()> {
 
     let meta = Meta {
         threads: rayon::current_num_threads(),
-        elapsed_ms: elapsed.as_millis(),
+        elapsed_ms: u64::try_from(elapsed.as_millis()).unwrap_or(u64::MAX),
     };
 
     let out = Output {
         experiment: "histogram",
-        config: &resolved,
+        config: resolved,
         meta,
         result,
     };

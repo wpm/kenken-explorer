@@ -31,13 +31,12 @@ struct Resolved {
 struct ResultData {
     uniqueness: &'static str,
     solutions: usize,
-    debug: String,
 }
 
 #[derive(Serialize)]
-struct Output<'a> {
-    experiment: &'a str,
-    config: &'a Resolved,
+struct Output {
+    experiment: &'static str,
+    config: Resolved,
     result: ResultData,
 }
 
@@ -65,12 +64,11 @@ pub fn run(config_path: Option<&Path>, args: GenerateArgs) -> Result<()> {
     let result = ResultData {
         uniqueness: uniqueness_str(puzzle.uniqueness()),
         solutions: puzzle.solutions(),
-        debug: format!("{puzzle:?}"),
     };
 
     let out = Output {
         experiment: "generate",
-        config: &resolved,
+        config: resolved,
         result,
     };
     println!("{}", serde_json::to_string(&out)?);
