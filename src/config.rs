@@ -119,7 +119,10 @@ max = 4
         assert_eq!(h.seed, Some(42));
         assert_eq!(h.max_solutions, Some(50));
         assert_eq!(h.op_policy, None);
-        assert!(matches!(h.size_distribution, Some(SizeDist::Uniform { min: 1, max: 4 })));
+        assert!(matches!(
+            h.size_distribution,
+            Some(SizeDist::Uniform { min: 1, max: 4 })
+        ));
     }
 
     #[test]
@@ -141,7 +144,10 @@ size = 3
         assert_eq!(g.n, Some(6));
         assert_eq!(g.seed, Some(7));
         assert_eq!(g.op_policy, None);
-        assert!(matches!(g.size_distribution, Some(SizeDist::Fixed { size: 3 })));
+        assert!(matches!(
+            g.size_distribution,
+            Some(SizeDist::Fixed { size: 3 })
+        ));
     }
 
     #[test]
