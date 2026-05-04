@@ -17,6 +17,13 @@ cargo build --release
 
 The binary is `target/release/kenken-explorer`.
 
+Pass `--help` to any subcommand for the full flag list:
+
+```bash
+kenken-explorer --help
+kenken-explorer histogram --help
+```
+
 ## Global flags
 
 | Flag | Description |
@@ -62,7 +69,7 @@ The main experiment. Generates `trials` independent n×n puzzles in parallel and
 kenken-explorer histogram --n 4 --trials 200 --seed 1
 ```
 
-Output (formatted for readability; higher solution buckets omitted):
+Output (formatted for readability; higher solution buckets omitted; `meta.threads` varies by machine):
 
 ```json
 {
@@ -98,10 +105,18 @@ A nonzero `no_solution_count` indicates a generator bug — every generated puzz
 
 ## Configuration files
 
-Every CLI flag can alternatively be set in a TOML file and passed with `--config`. CLI flags override file values when both are present.
+Every CLI flag can alternatively be set in a TOML file and passed with `--config`. CLI flags override file values when both are present. A single file can hold sections for both subcommands.
 
 ```toml
-# histogram.toml
+# experiments.toml
+[generate]
+n = 4
+seed = 0
+
+[generate.size_distribution]
+type = "fixed"
+size = 2
+
 [histogram]
 n = 4
 trials = 10000
@@ -115,7 +130,7 @@ max = 4
 ```
 
 ```bash
-kenken-explorer --config histogram.toml histogram --trials 500
+kenken-explorer --config experiments.toml histogram --trials 500
 ```
 
 The `--trials 500` CLI flag overrides `trials = 10000` from the file; all other values come from the file.
